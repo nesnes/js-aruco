@@ -217,16 +217,20 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
 
 AR.Detector.prototype.hammingDistance = function(bits){
   let markerSize = this.markerType.size;
-  var ids = [ [1,0,0,0,0], [1,0,1,1,1], [0,1,0,0,1], [0,1,1,1,0] ],
-      dist = 0, sum, minSum, i, j, k;
+  let ids = []
+  if(this.markerType==AR.MarkerTypeOriginal)
+    ids = [ [1,0,0,0,0], [1,0,1,1,1], [0,1,0,0,1], [0,1,1,1,0] ];
+  if(this.markerType==AR.MarkerType4x4)
+    ids = [ [0,0,1,0], [1,0,1,0], [1,1,0,1], [0,1,1,0] ];
+  var dist = 0, sum, minSum, i, j, k;
 
-  for (i = 0; i < 5; ++ i){
+  for (i = 0; i < markerSize-2; ++ i){
     minSum = Infinity;
     
     for (j = 0; j < 4; ++ j){
       sum = 0;
 
-      for (k = 0; k < 5; ++ k){
+      for (k = 0; k < markerSize-2; ++ k){
           sum += bits[i][k] === ids[j][k]? 0: 1;
       }
 
