@@ -213,7 +213,8 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
     if(this.markerType==AR.MarkerType4x4) dict = aruco4x4.dictionary;
     for(let markerId in dict){ //For each marker in dict
       for (i = 0; i < 4; i++){ //For each orientation
-        let dist = this.matrixDistance(dict[markerId], this.rotate2(bits, i));
+        let dist = this.matrixDistance(dict[markerId], bits);
+        console.log("4x4",dist, i, bits)
         if(dist<match.distance){
           match.distance = dist;
           match.rotation = i;
@@ -223,7 +224,7 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
       }
       if(match.dist==0) break;
     }
-    return new AR.Marker(match.id, this.rotate2(candidate, i), i);
+    return new AR.Marker(match.id, candidate, i);
   }
 };
 
