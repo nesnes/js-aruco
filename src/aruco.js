@@ -35,7 +35,13 @@ AR.Marker = function(id, corners){
   this.corners = corners;
 };
 
-AR.Detector = function(){
+AR.MarkerTypeOriginal = Object.freeze({size:7});
+AR.MarkerType4x4 = Object.freeze({size:6});
+AR.MarkerType5x5 = Object.freeze({size:7});
+AR.MarkerType6x6 = Object.freeze({size:8});
+AR.MarkerType7x7 = Object.freeze({size:9});
+
+AR.Detector = function(markerType=AR.MarkerTypeOriginal){
   this.grey = new CV.Image();
   this.thres = new CV.Image();
   this.homography = new CV.Image();
@@ -43,6 +49,7 @@ AR.Detector = function(){
   this.contours = [];
   this.polys = [];
   this.candidates = [];
+  this.markerType = markerType;
 };
 
 AR.Detector.prototype.detect = function(image){
@@ -157,15 +164,16 @@ AR.Detector.prototype.findMarkers = function(imageSrc, candidates, warpSize){
 };
 
 AR.Detector.prototype.getMarker = function(imageSrc, candidate){
-  var width = (imageSrc.width / 7) >>> 0,
+  let markerSize = this.markerType.size;
+  var width = (imageSrc.width / markerSize) >>> 0,
       minZero = (width * width) >> 1,
       bits = [], rotations = [], distances = [],
       square, pair, inc, i, j;
 
-  for (i = 0; i < 7; ++ i){
-    inc = (0 === i || 6 === i)? 1: 6;
+  for (i = 0; i < markerSize; ++ i){
+    inc = (0 === i || markerSize-1 === i)? 1: markerSize-1;
     
-    for (j = 0; j < 7; j += inc){
+    for (j = 0; j < markerSize; j += inc){
       square = {x: j * width, y: i * width, width: width, height: width};
       if ( CV.countNonZero(imageSrc, square) > minZero){
         return null;
@@ -173,10 +181,10 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
     }
   }
 
-  for (i = 0; i < 5; ++ i){
+  for (i = 0; i < markerSize-2; ++ i){
     bits[i] = [];
 
-    for (j = 0; j < 5; ++ j){
+    for (j = 0; j < markerSize-2; ++ j){
       square = {x: (j + 1) * width, y: (i + 1) * width, width: width, height: width};
       
       bits[i][j] = CV.countNonZero(imageSrc, square) > minZero? 1: 0;
@@ -208,6 +216,7 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
 };
 
 AR.Detector.prototype.hammingDistance = function(bits){
+  let markerSize = this.markerType.size;
   var ids = [ [1,0,0,0,0], [1,0,1,1,1], [0,1,0,0,1], [0,1,1,1,0] ],
       dist = 0, sum, minSum, i, j, k;
 
@@ -233,6 +242,7 @@ AR.Detector.prototype.hammingDistance = function(bits){
 };
 
 AR.Detector.prototype.mat2id = function(bits){
+  let markerSize = this.markerType.size;
   var id = 0, i;
   
   for (i = 0; i < 5; ++ i){
