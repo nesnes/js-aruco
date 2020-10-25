@@ -210,22 +210,25 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
   else {
     let dict = []
     match = {distance: Infinity, rotation: 0, id: NaN};
-    if(this.markerType==AR.MarkerType4x4) dict = aruco4x4.dictionary;
+    if(this.markerType==AR.MarkerType4x4) dict = aruco4x4;
     for(let markerId in dict){ //For each marker in dict
+      let matrix = bits;
       for (i = 0; i < 4; i++){ //For each orientation
-        let dist = this.matrixDistance(dict[markerId], bits);
-        console.log("4x4",dist, i, bits)
+        if(i>0) matrix = this.rotate(matrix);
+        let dist = this.matrixDistance(dict[markerId], matrix);
+        console.log("4x4",dist, i, matrix)
         if(dist<match.distance){
           match.distance = dist;
           match.rotation = i;
           match.id = markerId;
         }
-        if(match.dist==0) break;
+        if(match.distance==0) break;
       }
-      if(match.dist==0) break;
+      if(match.distance==0) break;
     }
-    return new AR.Marker(match.id, candidate, i);
+    if(match.distance==0) return new AR.Marker(match.id, candidate, i);
   }
+  return null;
 };
 
 AR.Detector.prototype.hammingDistance = function(bits, ref){
