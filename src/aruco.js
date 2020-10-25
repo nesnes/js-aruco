@@ -31,9 +31,10 @@ var aruco4x4 = require('./aruco4x4')
 
 var AR = AR || {};
 
-AR.Marker = function(id, corners){
+AR.Marker = function(id, corners, rotation=0){
   this.id = id;
   this.corners = corners;
+  this.rotation = rotation;
 };
 
 AR.MarkerTypeOriginal = Object.freeze({size:7});
@@ -169,7 +170,7 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
   var width = (imageSrc.width / markerSize) >>> 0,
       minZero = (width * width) >> 1,
       bits = [], rotations = [], distances = [],
-      square, pair, inc, i, j;
+      square, match, inc, i, j;
 
   for (i = 0; i < markerSize; ++ i){
     inc = (0 === i || markerSize-1 === i)? 1: markerSize-1;
@@ -191,61 +192,74 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
       bits[i][j] = CV.countNonZero(imageSrc, square) > minZero? 1: 0;
     }
   }
-
-  let id = NaN;
-  rotations[0] = bits;
-  distances[0], id = this.hammingDistance( rotations[0] );
-  
-  match = {distance: distances[0], rotation: 0, id: id};
-  
-  for (i = 1; i < 4; ++ i){
-    rotations[i] = this.rotate( rotations[i - 1] );
-    distances[i], id = this.hammingDistance( rotations[i] );
-    
-    if (distances[i] < match.distance){
-      match.distance = distances[i];
-      match.rotation = i;
+  if(this.markerType==AR.MarkerTypeOriginal){
+    rotations[0] = bits;
+    distances[0] = this.hammingDistance( rotations[0] );
+    match = {distance: distances[0], rotation: 0, id: NaN};
+    for (i = 1; i < 4; ++ i){
+      rotations[i] = this.rotate( rotations[i - 1] );
+      distances[i] = this.hammingDistance( rotations[i] );
+      if (distances[i] < match.distance){
+        match.distance = distances[i];
+        match.rotation = i;
+      }
     }
+    match.id = this.mat2id( rotations[match.rotation] )
+    return new AR.Marker(match.id, this.rotate2(candidate, 4 - match.rotation), 4 - match.rotation);
   }
-
-  if (0 !== match.distance){
-    return null;
+  else {
+    let dict = []
+    match = {distance: Infinity, rotation: 0, id: NaN};
+    if(this.markerType==AR.MarkerType4x4) dict = aruco4x4.dictionary;
+    for(let markerId in dict){ //For each marker in dict
+      for (i = 0; i < 4; i++){ //For each orientation
+        let dist = this.matrixDistance(dict[markerId], this.rotate2(bits, i));
+        if(dist<match.distance){
+          match.distance = dist;
+          match.rotation = i;
+          match.id = markerId;
+        }
+        if(match.dist==0) break;
+      }
+      if(match.dist==0) break;
+    }
+    return new AR.Marker(match.id, this.rotate2(candidate, i), i);
   }
-  if(this.markerType==AR.MarkerTypeOriginal) id = this.mat2id( rotations[match.rotation] )
-  if(this.markerType==AR.MarkerType4x4) id = match.id;
-  return new AR.Marker(
-    id, 
-    this.rotate2(candidate, 4 - match.rotation) );
 };
 
-AR.Detector.prototype.hammingDistance = function(bits){
-  let markerSize = this.markerType.size;
-  let ids = []
-  if(this.markerType==AR.MarkerTypeOriginal) ids = [ [1,0,0,0,0], [1,0,1,1,1], [0,1,0,0,1], [0,1,1,1,0] ];
-  if(this.markerType==AR.MarkerType4x4) ids = aruco4x4.dictionary;
-  var dist = 0, sum, minSum, i, k;
-  var bestId = NaN;
+AR.Detector.prototype.hammingDistance = function(bits, ref){
+  var ids = [ [1,0,0,0,0], [1,0,1,1,1], [0,1,0,0,1], [0,1,1,1,0] ],
+      dist = 0, sum, minSum, i, j, k;
 
-  for (i = 0; i < markerSize-2; ++ i){
+  for (i = 0; i < 5; ++ i){
     minSum = Infinity;
     
-    for (let j in ids){
+    for (j = 0; j < 4; ++ j){
       sum = 0;
 
-      for (k = 0; k < markerSize-2; ++ k){
+      for (k = 0; k < 5; ++ k){
           sum += bits[i][k] === ids[j][k]? 0: 1;
       }
 
       if (sum < minSum){
         minSum = sum;
-        if(this.markerType!=AR.MarkerTypeOriginal) bestId = j;
       }
     }
 
     dist += minSum;
   }
 
-  return dist, bestId;
+  return dist;
+};
+
+AR.Detector.prototype.matrixDistance = function(bits, ref){
+  let errors = 0;
+  for (i = 0; i < bits.length; i++){
+    for (j = 0; j < bits[i].length; j++){
+      errors += bits[i][j] === ref[i][j]? 0: 1;
+    }
+  }
+  return errors;
 };
 
 AR.Detector.prototype.mat2id = function(bits){
