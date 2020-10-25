@@ -27,6 +27,7 @@ References:
 */
 
 var CV = require('./cv');
+var aruco4x4 = require('./aruco4x4')
 
 var AR = AR || {};
 
@@ -191,43 +192,44 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
     }
   }
 
+  let id = NaN;
   rotations[0] = bits;
-  distances[0] = this.hammingDistance( rotations[0] );
+  distances[0], id = this.hammingDistance( rotations[0] );
   
-  pair = {first: distances[0], second: 0};
+  match = {distance: distances[0], rotation: 0, id: id};
   
   for (i = 1; i < 4; ++ i){
     rotations[i] = this.rotate( rotations[i - 1] );
-    distances[i] = this.hammingDistance( rotations[i] );
+    distances[i], id = this.hammingDistance( rotations[i] );
     
-    if (distances[i] < pair.first){
-      pair.first = distances[i];
-      pair.second = i;
+    if (distances[i] < match.distance){
+      match.distance = distances[i];
+      match.rotation = i;
     }
   }
 
-  if (0 !== pair.first){
+  if (0 !== match.distance){
     return null;
   }
-
+  if(this.markerType==AR.MarkerTypeOriginal) id = this.mat2id( rotations[match.rotation] )
+  if(this.markerType==AR.MarkerType4x4) id = match.id;
   return new AR.Marker(
-    this.mat2id( rotations[pair.second] ), 
-    this.rotate2(candidate, 4 - pair.second) );
+    id, 
+    this.rotate2(candidate, 4 - match.rotation) );
 };
 
 AR.Detector.prototype.hammingDistance = function(bits){
   let markerSize = this.markerType.size;
   let ids = []
-  if(this.markerType==AR.MarkerTypeOriginal)
-    ids = [ [1,0,0,0,0], [1,0,1,1,1], [0,1,0,0,1], [0,1,1,1,0] ];
-  if(this.markerType==AR.MarkerType4x4)
-    ids = [ [0,0,1,0], [1,0,1,0], [1,1,0,1], [0,1,1,0] ];
-  var dist = 0, sum, minSum, i, j, k;
+  if(this.markerType==AR.MarkerTypeOriginal) ids = [ [1,0,0,0,0], [1,0,1,1,1], [0,1,0,0,1], [0,1,1,1,0] ];
+  if(this.markerType==AR.MarkerType4x4) ids = aruco4x4.dictionary;
+  var dist = 0, sum, minSum, i, k;
+  var bestId = NaN;
 
   for (i = 0; i < markerSize-2; ++ i){
     minSum = Infinity;
     
-    for (j = 0; j < 4; ++ j){
+    for (let j in ids){
       sum = 0;
 
       for (k = 0; k < markerSize-2; ++ k){
@@ -236,20 +238,21 @@ AR.Detector.prototype.hammingDistance = function(bits){
 
       if (sum < minSum){
         minSum = sum;
+        if(this.markerType!=AR.MarkerTypeOriginal) bestId = j;
       }
     }
 
     dist += minSum;
   }
 
-  return dist;
+  return dist, bestId;
 };
 
 AR.Detector.prototype.mat2id = function(bits){
   let markerSize = this.markerType.size;
   var id = 0, i;
   
-  for (i = 0; i < 5; ++ i){
+  for (i = 0; i < markerSize-2; ++ i){
     id <<= 1;
     id |= bits[i][1];
     id <<= 1;
