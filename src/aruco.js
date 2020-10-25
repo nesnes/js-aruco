@@ -216,7 +216,6 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
       for (i = 0; i < 4; i++){ //For each orientation
         if(i>0) matrix = this.rotate(matrix);
         let dist = this.matrixDistance(dict[markerId], matrix);
-        console.log("4x4",dist, i, matrix)
         if(dist<match.distance){
           match.distance = dist;
           match.rotation = i;
